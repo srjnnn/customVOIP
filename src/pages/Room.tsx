@@ -6,7 +6,7 @@ import { useMediaDevices } from '../hooks/useMediaDevices';
 import MicMeter from '../components/ui/MicMeter';
 import Button from '../components/ui/Button';
 import VirtualBackground from '../components/layouts/VirtualBackground';
-import { toast } from '../components/ui/Toaster'; // ✅ global toast
+import { toast } from '../components/ui/Toaster';
 import { cn } from '../lib/utils';
 import { Mic, Headphones, Hand, Lock, Users } from 'lucide-react';
 
@@ -14,7 +14,11 @@ const Room: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const location = useLocation();
   const token = new URLSearchParams(location.search).get('token') || '';
-  const { room, participants, isConnected, isMuted, isDeafened, toggleMute, toggleDeafen } = useWebRTC(roomId!, token);
+  
+  // Pass the role as the third argument
+  const { room, participants, isConnected, isMuted, isDeafened, toggleMute, toggleDeafen } =
+    useWebRTC(roomId!, token, 'participant');
+
   const { devices, selectedAudioDevice, setSelectedAudioDevice } = useMediaDevices();
   const [isHandRaised, setIsHandRaised] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -60,6 +64,7 @@ const Room: React.FC = () => {
         <h1 className="text-2xl font-heading text-neutral-100 mb-4">
           Room: {roomId} {isConnected ? '(Connected)' : '(Disconnected)'}
         </h1>
+
         <div className="flex items-center space-x-4 mb-6">
           <MicMeter stream={stream} isMuted={isMuted} />
           <Button onClick={toggleMute} variant={isMuted ? 'accent' : 'primary'}>
@@ -78,6 +83,7 @@ const Room: React.FC = () => {
             {isBackgroundEnabled ? 'Disable Background' : 'Enable Background'}
           </Button>
         </div>
+
         <div className="mb-6">
           <label className="block text-neutral-100 mb-1">Audio Device</label>
           <select
@@ -92,6 +98,7 @@ const Room: React.FC = () => {
             ))}
           </select>
         </div>
+
         <div className="mb-6">
           <h2 className="text-xl font-heading text-neutral-100 mb-2">Participants</h2>
           <div className="space-y-2">
@@ -107,6 +114,7 @@ const Room: React.FC = () => {
             ))}
           </div>
         </div>
+
         <div className="flex space-x-4">
           <Button onClick={handleLockRoom} variant={isLocked ? 'accent' : 'primary'}>
             <Lock className="w-5 h-5 mr-2" />

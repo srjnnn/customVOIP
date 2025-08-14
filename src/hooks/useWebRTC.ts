@@ -11,7 +11,7 @@ interface WebRTCState {
   isDeafened: boolean;
 }
 
-export const useWebRTC = (roomId: string, token: string) => {
+export const useWebRTC = (roomId: string, displayName: string, role: 'host' | 'cohost' | 'participant') => {
   const [state, setState] = useState<WebRTCState>({
     room: null,
     participants: [],
@@ -22,18 +22,29 @@ export const useWebRTC = (roomId: string, token: string) => {
 
   const roomRef = useRef<Room | null>(null);
 
-  const connect = useCallback(async () => {
-    const room = new Room({
-      adaptiveStream: true,
-      dynacast: true,
-      audioCaptureDefaults: getAudioConfig().audio as any,
+  // Fetch LiveKit token from backend
+  const fetchLiveKitToken = useCallback(async () => {
+    const res = await fetch(`http://localhost:5000/rooms/${roomId}/tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName, role }),
     });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch token');
+    return data;
+  }, [roomId, displayName, role]);
 
+  const connect = useCallback(async () => {
     try {
-      console.log('Connecting with token:', token);
-      await room.connect('wss://voipproject-wbxy14tp.livekit.cloud', token, {
-        autoSubscribe: true,
+      const { token: livekitToken, url } = await fetchLiveKitToken();
+
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        audioCaptureDefaults: getAudioConfig().audio as any,
       });
+
+      await room.connect(url, livekitToken, { autoSubscribe: true });
 
       roomRef.current = room;
 
@@ -66,7 +77,7 @@ export const useWebRTC = (roomId: string, token: string) => {
       console.error('Connection error:', error);
       toast.error('Failed to connect to room');
     }
-  }, [roomId, token]);
+  }, [fetchLiveKitToken]);
 
   const toggleMute = useCallback(() => {
     setState((prev) => {
@@ -77,41 +88,38 @@ export const useWebRTC = (roomId: string, token: string) => {
     });
   }, []);
 
-const toggleDeafen = useCallback(() => {
-  setState((prev) => {
-    const newDeafened = !prev.isDeafened;
+  const toggleDeafen = useCallback(() => {
+    setState((prev) => {
+      const newDeafened = !prev.isDeafened;
 
-    prev.room?.participants.forEach((participant) => {
-      participant.audioTracks.forEach((publication) => {
-        const track = publication.track;
-        if (track && track.kind === 'audio') {
-          // Detach elements, mute/unmute, and re-attach
-          const elements = track.detach();
-          elements.forEach((el) => {
-            if (el instanceof HTMLAudioElement) {
-              el.muted = newDeafened;
-            }
-            // Re-attach the element to continue rendering
-            track.attach(el);
-          });
-        }
+      prev.room?.participants.forEach((participant) => {
+        participant.audioTracks.forEach((publication) => {
+          const track = publication.track;
+          if (track && track.kind === 'audio') {
+            const elements = track.detach();
+            elements.forEach((el) => {
+              if (el instanceof HTMLAudioElement) {
+                el.muted = newDeafened;
+              }
+              track.attach(el);
+            });
+          }
+        });
       });
+
+      return { ...prev, isDeafened: newDeafened };
     });
-
-    return { ...prev, isDeafened: newDeafened };
-  });
-}, []);
-
+  }, []);
 
   useEffect(() => {
-    if (token && roomId) {
+    if (roomId && displayName && role) {
       connect();
     }
 
     return () => {
       roomRef.current?.disconnect();
     };
-  }, [token, roomId, connect]);
+  }, [roomId, displayName, role, connect]);
 
   return {
     ...state,

@@ -19,20 +19,33 @@ const VirtualBackground: React.FC<VirtualBackgroundProps> = ({ stream, isEnabled
     if (!video || !canvas) return;
 
     video.srcObject = stream;
-    video.play();
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const applyBlur = () => {
-      ctx.filter = 'blur(10px)';
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      requestAnimationFrame(applyBlur);
+    const handleLoadedMetadata = async () => {
+      try {
+        await video.play();
+      } catch (err) {
+        console.warn('Video play was interrupted:', err);
+      }
+
+      const applyBlur = () => {
+        if (!ctx) return;
+        ctx.filter = 'blur(10px)';
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(applyBlur);
+      };
+
+      applyBlur();
     };
 
-    applyBlur();
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
     return () => {
+      video.pause();
+      video.srcObject = null;
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       ctx.filter = 'none';
     };
   }, [stream, isEnabled]);
