@@ -1,10 +1,13 @@
-import express, { Request, Response } from 'express';
+// import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express'; // type-only import
+
 import jwt from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import sanitizeHtml from 'sanitize-html';
-import supabase from './supabase.js';
+import supabase from './supabase.ts';
 
 const app = express();
 const wss = new WebSocketServer({ port: 8080 });
