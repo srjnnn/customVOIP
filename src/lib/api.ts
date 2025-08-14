@@ -1,5 +1,5 @@
 import { z } from 'zod';
-const backend = "http://localhost:5000"
+const backend = "https://customvoipbackend.onrender.com"
 
 const RoomSchema = z.object({
   id: z.string(),
