@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Room, RoomEvent, Participant, LocalTrackPublication } from 'livekit-client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Room, RoomEvent, Participant } from 'livekit-client';
 import { toast } from '../components/ui/Toaster';
 import { getAudioConfig } from '../lib/utils';
-
 
 interface WebRTCState {
   room: Room | null;
@@ -21,6 +20,8 @@ export const useWebRTC = (roomId: string, token: string) => {
     isDeafened: false,
   });
 
+  const roomRef = useRef<Room | null>(null);
+
   const connect = useCallback(async () => {
     const room = new Room({
       adaptiveStream: true,
@@ -29,9 +30,13 @@ export const useWebRTC = (roomId: string, token: string) => {
     });
 
     try {
-      await room.connect('wss://your-livekit-server.com', token, {
+      console.log('Connecting with token:', token);
+      await room.connect('wss://voipproject-wbxy14tp.livekit.cloud', token, {
         autoSubscribe: true,
       });
+
+      roomRef.current = room;
+
       setState((prev) => ({ ...prev, room, isConnected: true }));
       toast.success('Connected to room');
 
@@ -49,10 +54,10 @@ export const useWebRTC = (roomId: string, token: string) => {
         }));
       });
 
-      room.on(RoomEvent.ConnectionStateChanged, (state) => {
-        if (state === 'reconnecting') {
+      room.on(RoomEvent.ConnectionStateChanged, (connectionState) => {
+        if (connectionState === 'reconnecting') {
           toast.info('Reconnecting...');
-        } else if (state === 'disconnected') {
+        } else if (connectionState === 'disconnected') {
           setState((prev) => ({ ...prev, isConnected: false }));
           toast.error('Disconnected from room');
         }
@@ -64,48 +69,47 @@ export const useWebRTC = (roomId: string, token: string) => {
   }, [roomId, token]);
 
   const toggleMute = useCallback(() => {
-    if (state.room) {
-      state.room.localParticipant.setMicrophoneEnabled(!state.isMuted);
-      setState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
-    }
-  }, [state.room]);
-
-  // const toggleDeafen = useCallback(() => {
-  //   if (state.room) {
-  //     state.room.localParticipant.setAudioOutputEnabled(!state.isDeafened);
-  //     setState((prev) => ({ ...prev, isDeafened: !prev.isDeafened }));
-  //   }
-  // }, [state.room]);
-  const toggleDeafen = useCallback(() => {
-  if (!state.room) return;
-
-  state.room.participants.forEach((participant) => {
-    participant.audioTracks.forEach((publication) => {
-      const track = publication.track;
-      if (track && track.kind === "audio") {
-        // Get the HTML audio elements attached to this track
-        const attachedElements = track.detach(); // detach returns the HTMLMediaElement[]
-        attachedElements.forEach((el) => {
-          if (el instanceof HTMLAudioElement) {
-            el.muted = !state.isDeafened; // mute/unmute
-          }
-          // Re-attach to keep rendering
-          track.attach();
-        });
+    setState((prev) => {
+      if (prev.room) {
+        prev.room.localParticipant.setMicrophoneEnabled(!prev.isMuted);
       }
+      return { ...prev, isMuted: !prev.isMuted };
     });
-  });
+  }, []);
 
-  setState((prev) => ({ ...prev, isDeafened: !prev.isDeafened }));
-}, [state.room, state.isDeafened]);
+const toggleDeafen = useCallback(() => {
+  setState((prev) => {
+    const newDeafened = !prev.isDeafened;
+
+    prev.room?.participants.forEach((participant) => {
+      participant.audioTracks.forEach((publication) => {
+        const track = publication.track;
+        if (track && track.kind === 'audio') {
+          // Detach elements, mute/unmute, and re-attach
+          const elements = track.detach();
+          elements.forEach((el) => {
+            if (el instanceof HTMLAudioElement) {
+              el.muted = newDeafened;
+            }
+            // Re-attach the element to continue rendering
+            track.attach(el);
+          });
+        }
+      });
+    });
+
+    return { ...prev, isDeafened: newDeafened };
+  });
+}, []);
 
 
   useEffect(() => {
     if (token && roomId) {
       connect();
     }
+
     return () => {
-      state.room?.disconnect();
+      roomRef.current?.disconnect();
     };
   }, [token, roomId, connect]);
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 const backend = "https://customvoipbackend.onrender.com"
+// const backend = "http://localhost:5000";
 
 const RoomSchema = z.object({
   id: z.string(),
@@ -24,18 +25,19 @@ export const createRoom = async (data: {
   timezone: string;
   recurring?: boolean;
 }) => {
-  const response = await fetch(`${backend}/api/rooms`, {
+  const response = await fetch(`${backend}/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  console.log(response)
-  if (!response.ok) throw new Error('Failed to create room');
+  console.log('Creating room with data:', data);
+  console.log(response.ok)
+  // if (!response.ok) throw new Error('Failed to create room');
   return RoomSchema.parse(await response.json());
 };
 
 export const getRoom = async (roomId: string) => {
-  const response = await fetch(`${backend}/api/rooms/${roomId}`);
+  const response = await fetch(`${backend}/rooms/${roomId}`);
   if (!response.ok) throw new Error('Failed to fetch room');
   return RoomSchema.parse(await response.json());
 };
@@ -44,7 +46,7 @@ export const createToken = async (roomId: string, data: {
   role: 'host' | 'cohost' | 'participant';
   displayName: string;
 }) => {
-  const response = await fetch(`${backend}/api/rooms/${roomId}/tokens`, {
+  const response = await fetch(`${backend}/rooms/${roomId}/tokens`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

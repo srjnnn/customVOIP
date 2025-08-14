@@ -19,7 +19,7 @@ const Lobby: React.FC = () => {
 
     getRoom(roomId)
       .then((room) => setRoomState(room.state))
-      .catch(() => toast.error('Failed to fetch room status')); // ✅ use toast.error
+      .catch(() => toast.error('Failed to fetch room status')); 
   }, [roomId]);
 
   const handleJoin = async (e: React.FormEvent) => {
@@ -34,8 +34,8 @@ const Lobby: React.FC = () => {
 
     try {
       const { token } = await createToken(roomId, { role, displayName: sanitizedName });
-      toast.success('Joining room...'); // ✅ use toast.success
       navigate(`/room/${roomId}?token=${token}`);
+      toast.success('Joined room successfully'); 
     } catch (err) {
       toast.error('Failed to join room'); // ✅ use toast.error
     }
