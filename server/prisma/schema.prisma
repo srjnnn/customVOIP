@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Room {
+  id        String   @id
+  name      String
+  capacity  Int
+  startAt   DateTime
+  endAt     DateTime
+  timezone  String
+  recurring Boolean
+  state     String   @default("scheduled")
+  createdAt DateTime @default(now())
+}
