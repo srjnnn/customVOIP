@@ -1,18 +1,17 @@
-import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import express, { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { WebSocketServer } from 'ws';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { format } from 'date-fns';
 import sanitizeHtml from 'sanitize-html';
+import supabase from './supabase.js';
 
 const app = express();
-const prisma = new PrismaClient();
 const wss = new WebSocketServer({ port: 8080 });
 
 app.use(express.json());
 
+/** Zod Schemas */
 const RoomSchema = z.object({
   name: z.string().min(1).max(100),
   capacity: z.number().min(1).max(11).default(11),
@@ -27,68 +26,93 @@ const TokenSchema = z.object({
   displayName: z.string().min(1).max(50),
 });
 
-app.post('/rooms', async (req, res) => {
+/** Types inferred from Zod */
+type RoomInput = z.infer<typeof RoomSchema>;
+type TokenInput = z.infer<typeof TokenSchema>;
+
+/** Create a Room */
+app.post('/rooms', async (req: Request, res: Response) => {
   try {
-    const data = RoomSchema.parse(req.body);
-    const room = await prisma.room.create({
-      data: {
-        id: nanoid(10),
-        ...data,
-        state: 'scheduled',
-      },
-    });
+    const data: RoomInput = RoomSchema.parse(req.body);
+    const { data: room, error } = await supabase
+      .from('rooms')
+      .insert([{ id: nanoid(10), ...data, state: 'scheduled' }])
+      .select()
+      .single();
+
+    if (error) throw error;
     res.json(room);
-  } catch (error) {
-    res.status(400).json({ error: 'Invalid room data' });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
-app.get('/rooms/:id', async (req, res) => {
-  const room = await prisma.room.findUnique({
-    where: { id: req.params.id },
-  });
-  if (!room) return res.status(404).json({ error: 'Room not found' });
+/** Get Room by ID */
+app.get('/rooms/:id', async (req: Request, res: Response) => {
+  const { data: room, error } = await supabase
+    .from('rooms')
+    .select('*')
+    .eq('id', req.params.id)
+    .single();
+
+  if (error) return res.status(404).json({ error: 'Room not found' });
   res.json(room);
 });
 
-app.post('/rooms/:id/tokens', async (req, res) => {
+/** Generate JWT Token */
+app.post('/rooms/:id/tokens', async (req: Request, res: Response) => {
   try {
-    const data = TokenSchema.parse(req.body);
-    const room = await prisma.room.findUnique({
-      where: { id: req.params.id },
-    });
-    if (!room || room.state === 'closed') {
+    const data: TokenInput = TokenSchema.parse(req.body);
+
+    const { data: room, error } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error || !room || room.state === 'closed') {
       return res.status(400).json({ error: 'Room not available' });
     }
+
     const sanitizedName = sanitizeHtml(data.displayName, {
       allowedTags: [],
       allowedAttributes: {},
     });
+
     const token = jwt.sign(
       { roomId: req.params.id, role: data.role, identity: sanitizedName },
       process.env.JWT_SECRET || 'secret',
       { expiresIn: '15m' }
     );
+
     res.json({ token });
-  } catch (error) {
+  } catch (error: any) {
     res.status(400).json({ error: 'Invalid token data' });
   }
 });
 
-app.post('/rooms/:id/close', async (req, res) => {
-  const room = await prisma.room.update({
-    where: { id: req.params.id },
-    data: { state: 'closed' },
-  });
+/** Close Room */
+app.post('/rooms/:id/close', async (req: Request, res: Response) => {
+  const { data: room, error } = await supabase
+    .from('rooms')
+    .update({ state: 'closed' })
+    .eq('id', req.params.id)
+    .select()
+    .single();
+
+  if (error) return res.status(400).json({ error: error.message });
   res.json(room);
 });
 
+/** WebSocket Server */
 wss.on('connection', (ws) => {
-  ws.on('message', (message) => {
+  ws.on('message', (message: string | Buffer) => {
     console.log('Received:', message.toString());
+    // Optional: broadcast to other clients
   });
 });
 
+/** Start Express server */
 app.listen(5000, () => {
   console.log('Server running on http://localhost:5000');
 });
