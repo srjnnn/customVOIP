@@ -3,14 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { createRoom } from '../lib/api';
 import Button from '../components/ui/Button';
-import { cn } from '../lib/utils';
-import { Calendar, Clock } from 'lucide-react';
+import { start } from 'repl';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
   const [roomName, setRoomName] = useState('');
-  const [startAt, setStartAt] = useState('');
-  const [endAt, setEndAt] = useState('');
   const [timezone, setTimezone] = useState('UTC');
   const [error, setError] = useState('');
 
@@ -20,8 +17,6 @@ const Home: React.FC = () => {
       const room = await createRoom({
         name: roomName,
         capacity: 11,
-        startAt,
-        endAt,
         timezone,
         recurring: false,
       });
@@ -46,26 +41,6 @@ const Home: React.FC = () => {
               type="text"
               value={roomName}
               onChange={(e) => setRoomName(e.target.value)}
-              className="w-full p-2 rounded-lg bg-neutral-600 text-neutral-100"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-neutral-100 mb-1">Start Time</label>
-            <input
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-              className="w-full p-2 rounded-lg bg-neutral-600 text-neutral-100"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-neutral-100 mb-1">End Time</label>
-            <input
-              type="datetime-local"
-              value={endAt}
-              onChange={(e) => setEndAt(e.target.value)}
               className="w-full p-2 rounded-lg bg-neutral-600 text-neutral-100"
               required
             />
